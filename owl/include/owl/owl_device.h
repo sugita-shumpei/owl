@@ -225,6 +225,23 @@ namespace owl {
   extern "C" __global__ \
   void __miss__##programName
 
+#define OPTIX_DIRECT_CALLABLE_PROGRAM(programName) \
+  extern "C" __device__ \
+  void __direct_callable__##programName
+
+#define OPTIX_CONTINUATION_CALLABLE_PROGRAM(programName) \
+  extern "C" __device__ \
+  void __continuation_callable__##programName
+
+#define OPTIX_DIRECT_CALLABLE_PROGRAM_NON_VOID(programName, Ret) \
+  extern "C" __device__ \
+  Ret __direct_callable__##programName
+
+#define OPTIX_CONTINUATION_CALLABLE_PROGRAM_NON_VOID(programName,Ret) \
+  extern "C" __device__ \
+  Ret __continuation_callable__##programName
+
+
 /* defines the wrapper stuff to actually launch all the bounds
    programs from the host - todo: move to deviceAPI.h once working */
 #ifndef OPTIX_BOUNDS_PROGRAM

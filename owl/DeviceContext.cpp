@@ -408,6 +408,7 @@ namespace owl {
     buildMissPrograms();
     buildRayGenPrograms();
     buildHitGroupPrograms();
+    buildCallablePrograms();
   }
 
   void DeviceContext::buildCurvesModules()
@@ -466,7 +467,7 @@ namespace owl {
     destroyMissPrograms();
     destroyRayGenPrograms();
     destroyHitGroupPrograms();
-
+    destroyCallablePrograms();
     allActivePrograms.clear();
   }
 
@@ -554,6 +555,48 @@ namespace owl {
       allActivePrograms.push_back(dd.pg);
     }
   }
+
+  void DeviceContext::buildCallablePrograms()
+  {
+      for (size_t pgID = 0; pgID < parent->callableTypes.size(); pgID++) {
+          OptixProgramGroupOptions pgOptions = {};
+          OptixProgramGroupDesc    pgDesc = {};
+
+          CallableType* prog = parent->callableTypes.getPtr(pgID);
+          if (!prog) continue;
+
+          auto& dd = prog->getDD(shared_from_this());
+          assert(dd.pg == 0);
+
+          Module::SP module = prog->module;
+          assert(module);
+
+          OptixModule optixModule = module->getDD(shared_from_this()).module;
+          assert(optixModule);
+
+          pgDesc.kind = OPTIX_PROGRAM_GROUP_KIND_CALLABLES;
+          if (prog->is_direct_callable) {
+              pgDesc.callables.moduleDC = optixModule;
+              pgDesc.callables.entryFunctionNameDC = prog->annotatedProgName.c_str();
+          }
+          else {
+              pgDesc.callables.moduleCC = optixModule;
+              pgDesc.callables.entryFunctionNameCC = prog->annotatedProgName.c_str();
+          }
+
+          char log[2048];
+          size_t sizeof_log = sizeof(log);
+          OPTIX_CHECK(optixProgramGroupCreate(optixContext,
+              &pgDesc,
+              1,
+              &pgOptions,
+              log, &sizeof_log,
+              &dd.pg
+          ));
+          assert(dd.pg);
+          allActivePrograms.push_back(dd.pg);
+      }
+  }
   
   void DeviceContext::destroyRayGenPrograms()
   {
@@ -567,6 +610,20 @@ namespace owl {
       OPTIX_CHECK(optixProgramGroupDestroy(dd.pg));
       dd.pg = 0;
     }
+  }
+
+  void DeviceContext::destroyCallablePrograms()
+  {
+      for (size_t pgID = 0; pgID < parent->callableTypes.size(); pgID++) {
+          CallableType* prog = parent->callableTypes.getPtr(pgID);
+          if (!prog) continue;
+
+          auto& dd = prog->getDD(shared_from_this());
+          if (dd.pg == 0) continue;
+
+          OPTIX_CHECK(optixProgramGroupDestroy(dd.pg));
+          dd.pg = 0;
+      }
   }
   
   void DeviceContext::buildHitGroupPrograms()

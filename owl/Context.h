@@ -24,6 +24,7 @@
 #include "RayGen.h"
 #include "LaunchParams.h"
 #include "MissProg.h"
+#include "Callable.h"
 
 namespace owl {
 
@@ -70,6 +71,8 @@ namespace owl {
     void buildRayGenRecordsOn(const DeviceContext::SP &device);
     /*! part of the SBT creation - builds the miss group array */
     void buildMissProgRecordsOn(const DeviceContext::SP &device);
+    /*! part of the SBT creation - builds the callable   array */
+    void buildCallableRecordsOn(const DeviceContext::SP& device);
 
     /*! sets number of ray types to be used - should be done right
       after context creation, and before SBT and pipeline get
@@ -253,7 +256,21 @@ namespace owl {
 
     /*! sets miss prog to use for a given ray type */
     void setMissProg(int rayTypeToSet, MissProg::SP missProgToUse);
-    
+
+    /*! creates new callable program *type* with given program name (in
+      given module), and the given variable declarations that
+      describe this type's variables */
+    CallableType::SP
+        createCallableType(Module::SP module,
+            const std::string& progName,
+            bool direct_callable,
+            size_t varStructSize,
+            const std::vector<OWLVarDecl>& varDecls);
+
+    /*! create new instance of a callable program of given type */
+    Callable::SP
+        createCallable(const std::shared_ptr<CallableType>& type);
+
     /*! creates new geometry type defitiion with given variable declarations */
     GeomType::SP
     createGeomType(OWLGeomKind kind,
@@ -278,6 +295,8 @@ namespace owl {
     ObjectRegistryT<RayGen>       rayGens;
     ObjectRegistryT<MissProgType> missProgTypes;
     ObjectRegistryT<MissProg>     missProgs;
+    ObjectRegistryT<CallableType> callableTypes;
+    ObjectRegistryT<Callable>     callables;
     ObjectRegistryT<GeomType>     geomTypes;
     ObjectRegistryT<Geom>         geoms;
     ObjectRegistryT<Module>       modules;

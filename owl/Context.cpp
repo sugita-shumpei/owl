@@ -56,6 +56,8 @@ namespace owl {
       rayGens(this),
       missProgTypes(this),
       missProgs(this),
+      callableTypes(this),
+      callables(this),
       geomTypes(this),
       geoms(this),
       modules(this),
@@ -251,6 +253,13 @@ namespace owl {
     missProgPerRayType[rayTypeToSet] = missProgToUse;
   }
 
+  Callable::SP Context::createCallable(const std::shared_ptr<CallableType>& type)
+  {
+      Callable::SP mp = std::make_shared<Callable>(this, type);
+      mp->createDeviceData(getDevices());
+      return mp;
+  }
+
   RayGenType::SP
   Context::createRayGenType(Module::SP module,
                             const std::string &progName,
@@ -293,7 +302,17 @@ namespace owl {
     mpt->createDeviceData(getDevices());
     return mpt;
   }
-  
+
+  CallableType::SP Context::createCallableType(Module::SP module, const std::string& progName, bool direct_callable, size_t varStructSize, const std::vector<OWLVarDecl>& varDecls)
+  {
+      CallableType::SP mpt
+          = std::make_shared<CallableType>(this,
+              module, progName,
+              varStructSize,
+              varDecls, direct_callable);
+      mpt->createDeviceData(getDevices());
+      return mpt;
+  }
   
   GeomGroup::SP Context::trianglesGeomGroupCreate(size_t numChildren, unsigned int buildFlags)
   {
@@ -478,10 +497,55 @@ namespace owl {
     LOG_OK("done building (and uploading) SBT miss group records");
   }
 
+  void Context::buildCallableRecordsOn(const DeviceContext::SP& device)
+  {
+      LOG("building SBT callable group records");
+      SetActiveGPU forLifeTime(device);
+
+      size_t numCallableRecords = callables.size();
+      //if (numCallableRecords == 0) { return; }
+
+      size_t maxCallableDataSize = 0;
+      for (int i = 0; i < (int)callables.size(); i++) {
+          Callable::SP callable = callables.getSP(i);
+          if (!callable) continue;
+          assert(callable->type);
+          maxCallableDataSize = std::max(maxCallableDataSize, callable->type->varStructSize);
+      }
+
+      size_t callableRecordSize
+          = OPTIX_SBT_RECORD_HEADER_SIZE
+          + smallestMultipleOf<OPTIX_SBT_RECORD_ALIGNMENT>(maxCallableDataSize);
+
+      assert((OPTIX_SBT_RECORD_HEADER_SIZE % OPTIX_SBT_RECORD_ALIGNMENT) == 0);
+      device->sbt.callableRecordSize  = callableRecordSize;
+      device->sbt.callableRecordCount = numCallableRecords;
+
+      size_t totalCallableRecordsArraySize
+          = numCallableRecords * callableRecordSize;
+      std::vector<uint8_t> callableRecords(totalCallableRecordsArraySize);
+
+      // ------------------------------------------------------------------
+      // now, write all records (only on the host so far): we need to
+      // write one record per geometry, per ray type
+      // ------------------------------------------------------------------
+      for (size_t recordID = 0; recordID < numCallableRecords; recordID++) {
+          Callable::SP callable = callables.getSP(recordID);
+          if (!callable) continue;
+
+          uint8_t* const sbtRecord
+              = callableRecords.data() + recordID * callableRecordSize;
+          callable->writeSBTRecord(sbtRecord, device);
+      }
+      device->sbt.callableRecordsBuffer.alloc( callableRecords.size());
+      device->sbt.callableRecordsBuffer.upload(callableRecords);
+      LOG_OK("done building (and uploading) SBT callable group records");
+  }
+
 
   void Context::buildRayGenRecordsOn(const DeviceContext::SP &device)
   {
-    LOG("building SBT rayGen prog records");
+    LOG("building SBT callable records");
     SetActiveGPU forLifeTime(device);
 
     for (size_t rgID=0;rgID<rayGens.size();rgID++) {
@@ -510,6 +574,10 @@ namespace owl {
     if (flags & OWL_SBT_RAYGENS)
       for (auto device : getDevices())
         buildRayGenRecordsOn(device);
+
+    if (flags & OWL_SBT_CALLABLES)
+        for (auto device : getDevices())
+            buildCallableRecordsOn(device);
   }
 
   void Context::buildPipeline()

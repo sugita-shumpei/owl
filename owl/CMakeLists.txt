@@ -98,6 +98,8 @@ target_sources(owl PRIVATE
   LaunchParams.cpp
   MissProg.h
   MissProg.cpp
+  Callable.h
+  Callable.cpp
   Variable.h
   Variable.cpp
 

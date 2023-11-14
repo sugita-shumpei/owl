@@ -22,6 +22,7 @@
 #include "Group.h"
 #include "RayGen.h"
 #include "MissProg.h"
+#include "Callable.h"
 
 namespace owl {
 

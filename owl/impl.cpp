@@ -370,6 +370,14 @@ owlMissProgGetVariable(OWLMissProg _prog,
 }
 
 OWL_API OWLVariable
+owlCallableGetVariable(OWLCallable _prog,
+    const char* varName)
+{
+    LOG_API_CALL();
+    return getVariableHelper<Callable>((APIHandle*)_prog, varName);
+}
+
+OWL_API OWLVariable
 owlParamsGetVariable(OWLParams _prog,
                      const char *varName)
 {
@@ -457,6 +465,24 @@ owlMissProgSet(OWLContext _context,
     ? ((APIHandle *)_miss)->get<MissProg>()
     : MissProg::SP();
   checkGet(_context)->setMissProg(rayType,miss);
+}
+
+OWL_API OWLCallable owlCallableCreate(OWLContext _context, OWLModule _module, const char* programName, bool direct_callable, size_t sizeOfVarStruct, const OWLVarDecl* vars, int numVars)
+{
+    LOG_API_CALL();
+    APIContext::SP context = checkGet(_context);
+
+    assert(_module);
+    Module::SP module = ((APIHandle*)_module)->get<Module>();
+    assert(module);
+
+    CallableType::SP callableType
+        = context->createCallableType(module, programName, direct_callable,
+            sizeOfVarStruct,
+            checkAndPackVariables(vars, numVars));
+
+    Callable::SP callable = context->createCallable(callableType);
+    return (OWLCallable)context->createHandle(callable);
 }
 
 OWL_API OWLMissProg
@@ -992,7 +1018,13 @@ OWL_API void owlRayGenRelease(OWLRayGen handle)
   LOG_API_CALL();
   releaseObject<RayGen>((APIHandle*)handle);
 }
-  
+
+OWL_API void owlCallableRelease(OWLCallable handle)
+{
+    LOG_API_CALL();
+    releaseObject<Callable>((APIHandle*)handle);
+}
+
 OWL_API void owlVariableRelease(OWLVariable variable)
 {
   LOG_API_CALL();
@@ -1457,6 +1489,7 @@ OBJECT_SETTERS(RayGen)
 OBJECT_SETTERS(Geom)
 OBJECT_SETTERS(Params)
 OBJECT_SETTERS(MissProg)
+OBJECT_SETTERS(Callable)
 
 
 
