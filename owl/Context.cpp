@@ -545,7 +545,7 @@ namespace owl {
 
   void Context::buildRayGenRecordsOn(const DeviceContext::SP &device)
   {
-    LOG("building SBT callable records");
+    LOG("building SBT raygen records");
     SetActiveGPU forLifeTime(device);
 
     for (size_t rgID=0;rgID<rayGens.size();rgID++) {
